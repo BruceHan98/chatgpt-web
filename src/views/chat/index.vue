@@ -1,4 +1,5 @@
 <script setup lang='ts'>
+import type { Ref } from 'vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -7,7 +8,6 @@ import html2canvas from 'html2canvas'
 import { Message } from './components'
 import { useScroll } from './hooks/useScroll'
 import { useChat } from './hooks/useChat'
-import { useCopyCode } from './hooks/useCopyCode'
 import { useUsingContext } from './hooks/useUsingContext'
 import HeaderComponent from './components/Header/index.vue'
 import { HoverButton, SvgIcon } from '@/components/common'
@@ -26,20 +26,19 @@ const ms = useMessage()
 
 const chatStore = useChatStore()
 
-useCopyCode()
-
 const { isMobile } = useBasicLayout()
 const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
-const { scrollRef, scrollToBottom } = useScroll()
+const { scrollRef, scrollToBottom, scrollToBottomIfAtBottom } = useScroll()
 const { usingContext, toggleUsingContext } = useUsingContext()
 
 const { uuid } = route.params as { uuid: string }
 
 const dataSources = computed(() => chatStore.getChatByUuid(+uuid))
-const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !item.error)))
+const conversationList = computed(() => dataSources.value.filter(item => (!item.inversion && !!item.conversationOptions)))
 
 const prompt = ref<string>('')
 const loading = ref<boolean>(false)
+const inputRef = ref<Ref | null>(null)
 
 // 添加PromptStore
 const promptStore = usePromptStore()
@@ -115,7 +114,7 @@ async function onConversation() {
           const xhr = event.target
           const { responseText } = xhr
           // Always process the final line
-          const lastIndex = responseText.lastIndexOf('\n')
+          const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
           let chunk = responseText
           if (lastIndex !== -1)
             chunk = responseText.substring(lastIndex)
@@ -126,10 +125,10 @@ async function onConversation() {
               dataSources.value.length - 1,
               {
                 dateTime: new Date().toLocaleString(),
-                text: lastText + data.text ?? '',
+                text: lastText + (data.text ?? ''),
                 inversion: false,
                 error: false,
-                loading: false,
+                loading: true,
                 conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
                 requestOptions: { prompt: message, options: { ...options } },
               },
@@ -142,13 +141,14 @@ async function onConversation() {
               return fetchChatAPIOnce()
             }
 
-            scrollToBottom()
+            scrollToBottomIfAtBottom()
           }
           catch (error) {
-          //
+            //
           }
         },
       })
+      updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
     }
 
     await fetchChatAPIOnce()
@@ -164,7 +164,7 @@ async function onConversation() {
           loading: false,
         },
       )
-      scrollToBottom()
+      scrollToBottomIfAtBottom()
       return
     }
 
@@ -196,7 +196,7 @@ async function onConversation() {
         requestOptions: { prompt: message, options: { ...options } },
       },
     )
-    scrollToBottom()
+    scrollToBottomIfAtBottom()
   }
   finally {
     loading.value = false
@@ -230,7 +230,7 @@ async function onRegenerate(index: number) {
       error: false,
       loading: true,
       conversationOptions: null,
-      requestOptions: { prompt: message, ...options },
+      requestOptions: { prompt: message, options: { ...options } },
     },
   )
 
@@ -245,7 +245,7 @@ async function onRegenerate(index: number) {
           const xhr = event.target
           const { responseText } = xhr
           // Always process the final line
-          const lastIndex = responseText.lastIndexOf('\n')
+          const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
           let chunk = responseText
           if (lastIndex !== -1)
             chunk = responseText.substring(lastIndex)
@@ -256,12 +256,12 @@ async function onRegenerate(index: number) {
               index,
               {
                 dateTime: new Date().toLocaleString(),
-                text: lastText + data.text ?? '',
+                text: lastText + (data.text ?? ''),
                 inversion: false,
                 error: false,
-                loading: false,
+                loading: true,
                 conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-                requestOptions: { prompt: message, ...options },
+                requestOptions: { prompt: message, options: { ...options } },
               },
             )
 
@@ -277,6 +277,7 @@ async function onRegenerate(index: number) {
           }
         },
       })
+      updateChatSome(+uuid, index, { loading: false })
     }
     await fetchChatAPIOnce()
   }
@@ -304,7 +305,7 @@ async function onRegenerate(index: number) {
         error: true,
         loading: false,
         conversationOptions: null,
-        requestOptions: { prompt: message, ...options },
+        requestOptions: { prompt: message, options: { ...options } },
       },
     )
   }
@@ -452,6 +453,8 @@ const footerClass = computed(() => {
 
 onMounted(() => {
   scrollToBottom()
+  if (inputRef.value && !isMobile.value)
+    inputRef.value?.focus()
 })
 
 onUnmounted(() => {
@@ -469,11 +472,7 @@ onUnmounted(() => {
       @toggle-using-context="toggleUsingContext"
     />
     <main class="flex-1 overflow-hidden">
-      <div
-        id="scrollRef"
-        ref="scrollRef"
-        class="h-full overflow-hidden overflow-y-auto"
-      >
+      <div id="scrollRef" ref="scrollRef" class="h-full overflow-hidden overflow-y-auto">
         <div
           id="image-wrapper"
           class="w-full max-w-screen-xl m-auto dark:bg-[#101014]"
@@ -532,6 +531,7 @@ onUnmounted(() => {
           <NAutoComplete v-model:value="prompt" :options="searchOptions" :render-label="renderOption">
             <template #default="{ handleInput, handleBlur, handleFocus }">
               <NInput
+                ref="inputRef"
                 v-model:value="prompt"
                 type="textarea"
                 :placeholder="placeholder"

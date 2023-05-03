@@ -28,12 +28,8 @@ export default {
     unauthorizedTips: 'Unauthorized, please verify first.',
   },
   chat: {
-<<<<<<< HEAD
-    placeholder: 'Ask me anything ... [Shift + Enter = line break]',
-=======
+    placeholder: 'Ask me anything... [Shift + Enter = line break]',
     newChatButton: 'New Chat',
-    placeholder: 'Ask me anything...(Shift + Enter = line break, "/" to trigger prompts)',
->>>>>>> upstream/main
     placeholderMobile: 'Ask me anything...',
     copy: 'Copy',
     copied: 'Copied',

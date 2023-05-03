@@ -50,14 +50,7 @@ onMounted(() => {
           >
             GitHub
           </a>
-<<<<<<< HEAD
           ，基于 MIT 协议。
-=======
-          ，免费且基于 MIT 协议，没有任何形式的付费行为！
-        </p>
-        <p>
-          如果你觉得此项目对你有帮助，请在 GitHub 帮我点个 Star 或者给予一点赞助，谢谢！
->>>>>>> upstream/main
         </p>
       </div>
       <p>{{ $t("setting.api") }}：{{ config?.apiModel ?? '-' }}</p>
